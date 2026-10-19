@@ -1,0 +1,23 @@
+name: Sync all forks
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+    steps:
+      - name: Sync every fork from its upstream
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          gh repo list "$OWNER" --fork --limit 1000 \
+            --json nameWithOwner,defaultBranchRef \
+            --jq '.[] | "\(.nameWithOwner) \(.defaultBranchRef.name)"' |
+          while read -r repo branch; do
+            echo "Syncing $repo ($branch)"
+            gh repo sync "$repo" --branch "$branch" --force < /dev/null \
+              || echo "::warning::Failed to sync $repo"
+          done
